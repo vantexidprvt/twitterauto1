@@ -3,26 +3,31 @@ import requests
 
 app = Flask(__name__)
 
-# Hugging Face API URL and API key
-HF_API_URL = "https://api-inference.huggingface.co/models/Qwen/QwQ-32B-Preview/v1/chat/completions"
-HF_API_KEY = "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"
-
-# Define headers for the API call (including Connection: close if desired)
-headers = {
-    "Authorization": f"Bearer {HF_API_KEY}",
-    "Content-Type": "application/json",
-    "Connection": "close"  # Optional: Force closing the connection after each request
-}
-
 @app.route('/generate', methods=['POST'])
 def generate_response():
     try:
-        # Extract the user's input from the JSON body of the request
-        user_input = request.json.get('user_input', '')
+        # Get data from the request JSON
+        data = request.json
+        
+        # Extract required parameters from the request; you can also add validations if needed
+        hf_api_url = data.get('hf_api_url', '')
+        hf_api_key = data.get('hf_api_key', '')
+        model = data.get('model', '')
+        user_input = data.get('user_input', '')
+        
+        if not all([hf_api_url, hf_api_key, model, user_input]):
+            return jsonify({"error": "hf_api_url, hf_api_key, model, and user_input are required"}), 400
+
+        # Define headers for the API call (including Connection: close if desired)
+        headers = {
+            "Authorization": f"Bearer {hf_api_key}",
+            "Content-Type": "application/json",
+            "Connection": "close"  # Optional: Force closing the connection after each request
+        }
 
         # Construct the payload for the Hugging Face API call
         payload = {
-            "model": "Qwen/QwQ-32B-Preview",
+            "model": model,
             "messages": [
                 {
                     "role": "system",
@@ -39,8 +44,8 @@ def generate_response():
             "stream": False  # Disable streaming for easier handling
         }
 
-        # Send the POST request to the Hugging Face API
-        response = requests.post(HF_API_URL, headers=headers, json=payload)
+        # Send the POST request to the provided Hugging Face API URL
+        response = requests.post(hf_api_url, headers=headers, json=payload)
 
         # If the request was successful, return the API response as JSON
         if response.status_code == 200:
