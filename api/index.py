@@ -10,14 +10,8 @@ def generate_response(prompt_input, email, passwd, model_index=0, system_prompt=
     cookies = sign.login()
     # Create ChatBot
     chatbot = hugchat.ChatBot(cookies=cookies.get_dict())
-    # Retrieve available models
-    models = chatbot.get_available_llm_models()
-    # Check if the provided model_index is within the range of available models
-    if 0 <= model_index < len(models):
-        # Create a new conversation and switch to the desired model
-        chatbot.new_conversation(switch_to=True, modelIndex=model_index)
-    else:
-        print("Invalid model index. Using the default model.")
+    # Create a new conversation and switch to the desired model
+    chatbot.new_conversation(switch_to=True, modelIndex=model_index)
     # Set the system prompt if provided
     if system_prompt:
         chatbot.system_prompt = system_prompt
