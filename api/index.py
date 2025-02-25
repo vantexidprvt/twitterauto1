@@ -1,62 +1,51 @@
 from flask import Flask, request, jsonify
-import requests
+from hugchat import hugchat
+from hugchat.login import Login
 
 app = Flask(__name__)
 
+def generate_response(prompt_input, email, passwd, model_index=0, system_prompt=None):
+    # Hugging Face Login
+    sign = Login(email, passwd)
+    cookies = sign.login()
+    # Create ChatBot
+    chatbot = hugchat.ChatBot(cookies=cookies.get_dict())
+    # Retrieve available models
+    models = chatbot.get_available_llm_models()
+    # Check if the provided model_index is within the range of available models
+    if 0 <= model_index < len(models):
+        # Create a new conversation and switch to the desired model
+        chatbot.new_conversation(switch_to=True, modelIndex=model_index)
+    else:
+        print("Invalid model index. Using the default model.")
+    # Set the system prompt if provided
+    if system_prompt:
+        chatbot.system_prompt = system_prompt
+    # Generate response
+    response = chatbot.chat(prompt_input)
+    # Ensure the response is fully processed before deleting the conversation
+    response_text = str(response)  # Convert response to string to process it
+    # Delete the current conversation to clear chat history
+    chatbot.delete_conversation()
+    return response_text
+
 @app.route('/generate', methods=['POST'])
-def generate_response():
+def generate():
+    data = request.json
+    prompt = data.get('prompt')
+    email = data.get('email')
+    password = data.get('password')
+    model_index = data.get('model_index', 0)
+    system_prompt = data.get('system_prompt', None)
+
+    if not all([prompt, email, password]):
+        return jsonify({'error': 'Prompt, email, and password are required.'}), 400
+
     try:
-        # Get data from the request JSON
-        data = request.json
-        
-        # Extract required parameters from the request; you can also add validations if needed
-        hf_api_url = data.get('hf_api_url', '')
-        hf_api_key = data.get('hf_api_key', '')
-        model = data.get('model', '')
-        user_input = data.get('user_input', '')
-        
-        if not all([hf_api_url, hf_api_key, model, user_input]):
-            return jsonify({"error": "hf_api_url, hf_api_key, model, and user_input are required"}), 400
-
-        # Define headers for the API call (including Connection: close if desired)
-        headers = {
-            "Authorization": f"Bearer {hf_api_key}",
-            "Content-Type": "application/json",
-            "Connection": "close"  # Optional: Force closing the connection after each request
-        }
-
-        # Construct the payload for the Hugging Face API call
-        payload = {
-            "model": model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are a helpful and harmless assistant. You are Qwen developed by Alibaba. You should think step-by-step."
-                },
-                {
-                    "role": "user",
-                    "content": user_input
-                }
-            ],
-            "temperature": 0.5,
-            "max_tokens": 2048,
-            "top_p": 0.7,
-            "stream": False  # Disable streaming for easier handling
-        }
-
-        # Send the POST request to the provided Hugging Face API URL
-        response = requests.post(hf_api_url, headers=headers, json=payload)
-
-        # If the request was successful, return the API response as JSON
-        if response.status_code == 200:
-            return jsonify(response.json())
-        else:
-            # If there was an error, return the error message and status code
-            return jsonify({"error": response.text}), response.status_code
-
+        response = generate_response(prompt, email, password, model_index, system_prompt)
+        return jsonify({'response': response})
     except Exception as e:
-        # Catch any exceptions and return an error response
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
