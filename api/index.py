@@ -1,42 +1,55 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 from hugchat import hugchat
 from hugchat.login import Login
+import secrets
+import uuid
 
 app = Flask(__name__)
 
-def generate_response(prompt_input, email, passwd, model_index=0, system_prompt=None):
-    # Hugging Face Login
-    sign = Login(email, passwd)
-    cookies = sign.login()
-    # Create ChatBot
-    chatbot = hugchat.ChatBot(cookies=cookies.get_dict())
-    # Create a new conversation and switch to the desired model
-    chatbot.new_conversation(switch_to=True, modelIndex=model_index)
-    # Set the system prompt if provided
-    if system_prompt:
-        chatbot.system_prompt = system_prompt
-    # Generate response
-    response = chatbot.chat(prompt_input)
-    # Ensure the response is fully processed before deleting the conversation
-    response_text = str(response)  # Convert response to string to process it
-    # Delete the current conversation to clear chat history
-    chatbot.delete_conversation()
-    return response_text
+# Generate a secure random secret key
+app.secret_key = secrets.token_hex(16)
+
+# Authenticate once and create a persistent ChatBot instance
+email = 'becevofo@thetechnext.net'
+password = 'Lumeth12#'
+sign = Login(email, password)
+cookies = sign.login()
+chatbot = hugchat.ChatBot(cookies=cookies.get_dict())
+
+# Dictionary to manage user-specific conversations
+user_conversations = {}
 
 @app.route('/generate', methods=['POST'])
 def generate():
     data = request.json
     prompt = data.get('prompt')
-    email = data.get('email')
-    password = data.get('password')
     model_index = data.get('model_index', 0)
-    system_prompt = data.get('system_prompt', None)
+    system_prompt = data.get('system_prompt')
 
-    if not all([prompt, email, password]):
-        return jsonify({'error': 'Prompt, email, and password are required.'}), 400
+    if not prompt:
+        return jsonify({'error': 'Prompt is required.'}), 400
+
+    # Assign a unique user ID if not already present in the session
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
+
+    user_id = session['user_id']
+
+    # Retrieve or create a conversation ID for the user
+    if user_id not in user_conversations:
+        conversation_id = chatbot.new_conversation()
+        user_conversations[user_id] = conversation_id
+    else:
+        conversation_id = user_conversations[user_id]
 
     try:
-        response = generate_response(prompt, email, password, model_index, system_prompt)
+        # Switch to the desired model if necessary
+        chatbot.change_model(model_index)
+        # Set the system prompt if provided
+        if system_prompt:
+            chatbot.system_prompt = system_prompt
+        # Generate response
+        response = chatbot.chat(prompt, conversation_id=conversation_id)
         return jsonify({'response': response})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
