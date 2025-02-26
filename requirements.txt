@@ -2,6 +2,4 @@ Flask==3.0.3
 huggingface-hub==0.29.1
 requests==2.32.3
 hugchat==0.4.18
-secrets==1.0.2
-uuid==1.30
-pyOpenSSL==25.0.0
+
