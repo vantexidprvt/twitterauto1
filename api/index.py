@@ -1,45 +1,64 @@
 from flask import Flask, request, jsonify
-from hugchat import hugchat
-from hugchat.login import Login
+from gradio_client import Client
+import requests
+import os
 
 app = Flask(__name__)
-
-def generate_response(prompt_input, email, passwd, model_index=0, system_prompt=None):
-    # Hugging Face Login
-    sign = Login(email, passwd)
-    cookies = sign.login()
-    # Create ChatBot
-    chatbot = hugchat.ChatBot(cookies=cookies.get_dict())
-    # Create a new conversation and switch to the desired model
-    chatbot.new_conversation(switch_to=True, modelIndex=model_index)
-    # Set the system prompt if provided
-    if system_prompt:
-        chatbot.system_prompt = system_prompt
-    # Generate response
-    response = chatbot.chat(prompt_input)
-    # Ensure the response is fully processed before deleting the conversation
-    response_text = str(response)  # Convert response to string to process it
-    # Delete the current conversation to clear chat history
-    chatbot.delete_conversation()
-    return response_text
+client = Client("black-forest-labs/FLUX.1-schnell")
 
 @app.route('/generate', methods=['POST'])
-def generate():
-    data = request.json
-    prompt = data.get('prompt')
-    email = data.get('email')
-    password = data.get('password')
-    model_index = data.get('model_index', 0)
-    system_prompt = data.get('system_prompt', None)
-
-    if not all([prompt, email, password]):
-        return jsonify({'error': 'Prompt, email, and password are required.'}), 400
-
+def generate_image():
     try:
-        response = generate_response(prompt, email, password, model_index, system_prompt)
-        return jsonify({'response': response})
+        data = request.json
+
+        prompt = data.get("prompt", "")
+        seed = data.get("seed", 42)
+        randomize_seed = data.get("randomize_seed", True)
+        width = data.get("width", 1024)
+        height = data.get("height", 1024)
+        num_inference_steps = data.get("num_inference_steps", 4)
+
+        # Step 1: Generate the image
+        result = client.predict(
+            prompt=prompt,
+            seed=seed,
+            randomize_seed=randomize_seed,
+            width=width,
+            height=height,
+            num_inference_steps=num_inference_steps,
+            api_name="/infer"
+        )
+
+        # Step 2: Handle result
+        if isinstance(result, str) and result.startswith("http"):
+            return jsonify({"image_url": result})
+
+        elif os.path.isfile(result):
+            # Step 3: Upload the file
+            with open(result, 'rb') as f:
+                upload_response = requests.post(
+                    'https://tmpfiles.org/api/v1/upload',
+                    files={'file': f}
+                )
+
+            # Step 4: Parse the response
+            upload_json = upload_response.json()
+            tmp_url = upload_json.get("data", {}).get("url")
+
+            # Step 5: Delete the local file
+            os.remove(result)
+
+            if tmp_url:
+                return jsonify({"image_url": tmp_url})
+            else:
+                return jsonify({"error": "Upload failed"}), 500
+
+        else:
+            return jsonify({"error": "Unexpected result format"}), 500
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
