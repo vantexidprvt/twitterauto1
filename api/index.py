@@ -18,8 +18,8 @@ def generate_image():
         height = data.get("height", 1024)
         num_inference_steps = data.get("num_inference_steps", 4)
 
-        # Step 1: Generate the image
-        result = client.predict(
+        # Step 1: Generate the image (returns a tuple, extract only file path)
+        result_tuple = client.predict(
             prompt=prompt,
             seed=seed,
             randomize_seed=randomize_seed,
@@ -28,24 +28,21 @@ def generate_image():
             num_inference_steps=num_inference_steps,
             api_name="/infer"
         )
+        result = result_tuple[0]  # Get only the file path
 
-        # Step 2: Handle result
-        if isinstance(result, str) and result.startswith("http"):
-            return jsonify({"image_url": result})
-
-        elif os.path.isfile(result):
-            # Step 3: Upload the file
+        # Step 2: Upload to tmpfiles.org
+        if os.path.isfile(result):
             with open(result, 'rb') as f:
                 upload_response = requests.post(
                     'https://tmpfiles.org/api/v1/upload',
                     files={'file': f}
                 )
 
-            # Step 4: Parse the response
+            # Step 3: Parse the response
             upload_json = upload_response.json()
             tmp_url = upload_json.get("data", {}).get("url")
 
-            # Step 5: Delete the local file
+            # Step 4: Delete the local file
             os.remove(result)
 
             if tmp_url:
@@ -54,7 +51,7 @@ def generate_image():
                 return jsonify({"error": "Upload failed"}), 500
 
         else:
-            return jsonify({"error": "Unexpected result format"}), 500
+            return jsonify({"error": "Generated file not found"}), 500
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
