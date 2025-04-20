@@ -42,11 +42,14 @@ def generate_image():
             upload_json = upload_response.json()
             tmp_url = upload_json.get("data", {}).get("url")
 
-            # Step 4: Delete the local file
-            os.remove(result)
-
+            # Modify the URL to add "/dl" to it
             if tmp_url:
-                return jsonify({"image_url": tmp_url})
+                modified_url = tmp_url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/")
+
+                # Step 4: Delete the local file
+                os.remove(result)
+
+                return jsonify({"image_url": modified_url})
             else:
                 return jsonify({"error": "Upload failed"}), 500
 
