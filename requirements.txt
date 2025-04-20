@@ -1,5 +1,4 @@
 Flask==3.0.3
-huggingface-hub==0.29.1
 requests==2.32.3
-hugchat==0.4.18
+gradio-client==1.8.0
 
