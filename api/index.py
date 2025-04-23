@@ -11,6 +11,7 @@ client = Client("AIRI-Institute/HairFastGAN")
 
 UPLOAD_API = "https://tmpfiles.org/api/v1/upload"
 
+# Function to download and upload the image to tmpfiles.org
 def download_and_upload(image_url):
     try:
         response = requests.get(image_url)
@@ -48,11 +49,13 @@ def process_images():
 
     def call_resize(endpoint, url, key):
         try:
+            # Step 1: Download the image and upload it to tmpfiles.org
             link = download_and_upload(url)
-            result[key] = client.predict(img=file(link), align=["Face", "Shape", "Color"], api_name=endpoint)
+            result[key] = {"link": link, "processed": client.predict(img=file(link), align=["Face", "Shape", "Color"], api_name=endpoint)}
         except Exception as e:
             result[key] = {"error": str(e)}
 
+    # Step 2: Process each image (face, shape, color) in parallel
     threads = [
         threading.Thread(target=call_resize, args=("/resize_inner", face_url, "face")),
         threading.Thread(target=call_resize, args=("/resize_inner_1", shape_url, "shape")),
@@ -68,22 +71,33 @@ def process_images():
         return jsonify({"error": "One or more resize stages failed", "details": result}), 500
 
     try:
-        final = client.predict(
-            face=file(result["face"]),
-            shape=file(result["shape"]),
-            color=file(result["color"]),
+        # Step 3: Perform the final swap
+        final_image = client.predict(
+            face=file(result["face"]["processed"]),
+            shape=file(result["shape"]["processed"]),
+            color=file(result["color"]["processed"]),
             blending="Article",
             poisson_iters=2500,
             poisson_erosion=100,
             api_name="/swap_hair"
         )
 
-        # Upload the final result
-        with open(final, "rb") as final_img:
+        # Step 4: Upload the final result to tmpfiles.org
+        with open(final_image, "rb") as final_img:
             final_upload = requests.post(UPLOAD_API, files={"file": final_img})
             final_upload.raise_for_status()
             url_part = final_upload.text.split("/")[-1].strip()
-            return jsonify({"result_url": f"https://tmpfiles.org/{url_part}/image.webp"})
+            final_link = f"https://tmpfiles.org/dl/{url_part}/image.webp"
+            
+            # Step 5: Return the processed resized images and final result link
+            return jsonify({
+                "resized": {
+                    "face": result["face"]["link"],
+                    "shape": result["shape"]["link"],
+                    "color": result["color"]["link"]
+                },
+                "result_url": final_link
+            })
 
     except Exception as e:
         return jsonify({"error": "Final hair swap failed", "details": str(e)}), 500
