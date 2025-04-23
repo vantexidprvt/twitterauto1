@@ -24,6 +24,7 @@ def process_file_with_gradio(image_url):
             align=["Face", "Shape", "Color"],
             api_name="/resize_inner"
         )
+        print(f"Processing result: {result}")  # Debugging line
         return result
     except Exception as e:
         return {"error": str(e)}
@@ -53,7 +54,11 @@ def process_image():
     try:
         processing_result = process_file_with_gradio(image_url)
 
-        if 'error' in processing_result:
+        # Log the result for debugging
+        print(f"Processing result: {processing_result}")  # Debugging line
+
+        # Check if the result contains an error
+        if isinstance(processing_result, dict) and 'error' in processing_result:
             return jsonify({"error": processing_result['error']}), 500
 
         resized_image_path = processing_result.get('result')
@@ -71,6 +76,7 @@ def process_image():
             return jsonify({"error": "Resized image path not found."}), 500
 
     except Exception as e:
+        print(f"Error during image processing: {str(e)}")  # Debugging line
         return jsonify({"error": str(e)}), 500
 
 
