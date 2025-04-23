@@ -5,7 +5,7 @@ from gradio_client import Client, file
 
 app = Flask(__name__)
 
-# Step 1: Upload file to tmpfiles.org
+# Step 1: Upload the resized image to tmpfiles.org
 def upload_file_to_tmpfiles(file_path):
     upload_url = "https://tmpfiles.org/api/v1/upload"
     with open(file_path, 'rb') as f:
@@ -15,7 +15,7 @@ def upload_file_to_tmpfiles(file_path):
     else:
         return None
 
-# Step 2: Process the uploaded file with HairFastGAN and get resized image
+# Step 2: Process the provided image URL with HairFastGAN and get resized image
 def process_file_with_gradio(image_url):
     client = Client("AIRI-Institute/HairFastGAN")
     try:
