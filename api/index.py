@@ -40,7 +40,7 @@ def process_hair_swap():
             img=file(face_url),
             align=["Face", "Shape", "Color"],
             api_name="/resize_inner"
-        )
+        )[0]['value']  # Extract the file path from the tuple
         face_dl_url = upload_to_tmpfiles(face_img)
 
         # Resize step for shape
@@ -48,7 +48,7 @@ def process_hair_swap():
             img=file(shape_url),
             align=["Face", "Shape", "Color"],
             api_name="/resize_inner_1"
-        )
+        )[0]['value']  # Extract the file path from the tuple
         shape_dl_url = upload_to_tmpfiles(shape_img)
 
         # Resize step for color
@@ -56,7 +56,7 @@ def process_hair_swap():
             img=file(color_url),
             align=["Face", "Shape", "Color"],
             api_name="/resize_inner_2"
-        )
+        )[0]['value']  # Extract the file path from the tuple
         color_dl_url = upload_to_tmpfiles(color_img)
 
         # Hair swap
@@ -68,7 +68,7 @@ def process_hair_swap():
             poisson_iters=int(data.get("poisson_iters", 2500)),
             poisson_erosion=int(data.get("poisson_erosion", 100)),
             api_name="/swap_hair"
-        )
+        )[0]['value']  # Extract the file path from the tuple
 
         result_dl_url = upload_to_tmpfiles(result_img)
 
